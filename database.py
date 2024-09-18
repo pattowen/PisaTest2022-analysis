@@ -94,3 +94,4 @@ def fetch_data_and_count(oecd_status, countries, question_code):
 
     conn.close()
     return data_counts
+

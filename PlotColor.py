@@ -1,5 +1,6 @@
 import seaborn as sb
 import random
+import numpy as np
 
 # Initialize country_colors dictionary to store generated colors
 country_colors = {}
@@ -8,18 +9,26 @@ country_colors = {}
 def generate_random_color():
     return sb.color_palette('husl', as_cmap=True)(random.random())
 
-# Function to ensure generated colors are visually distinct
+
 def ensure_visual_distinctness():
     global country_colors
 
-    # Check color distance and ensure colors are visually distinct
-    for country in country_colors:
+    # List of country names for comparison
+    countries = list(country_colors.keys())
+
+    # Loop through each country and compare its color with others
+    for i, country in enumerate(countries):
         color = country_colors[country]
-        for existing_country, existing_color in country_colors.items():
-            if country != existing_country:
-                # Calculate color distance (Euclidean distance in RGB space)
-                color_distance = ((color[0] - existing_color[0])**2 + (color[1] - existing_color[1])**2 + (color[2] - existing_color[2])**2)**0.5
-                if color_distance < 0.5:  # Adjust threshold as needed for distinctness
-                    # Generate a new color if distance is too small
-                    country_colors[country] = generate_random_color()
-                    ensure_visual_distinctness()  # Recursively check again
+
+        for j, existing_country in enumerate(countries):
+            if i != j:
+                existing_color = country_colors[existing_country]
+
+                # Calculate the Euclidean distance between two RGB colors
+                color_distance = np.linalg.norm(np.array(color) - np.array(existing_color))
+
+                # If the color distance is too small, generate a new color
+                while color_distance < 0.5:
+                    new_color = generate_random_color()
+                    country_colors[country] = new_color
+                    color_distance = np.linalg.norm(np.array(new_color) - np.array(existing_color))

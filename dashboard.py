@@ -4,7 +4,6 @@ import streamlit.components.v1 as components
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sb
-import random
 from main import *
 from database import *
 from PlotColor import *
@@ -13,7 +12,7 @@ from PlotColor import *
 def home_page():
     st.subheader("🌐 Pisa2022 Data Analytics")
     score_type = st.selectbox('Select Score Type', ('Mathematics', 'Science', 'Reading', 'Overall'))
-    oecd_status = st.selectbox('Select OECD Status', ('All', 'OECD', 'NON-OECD'))   
+    oecd_status = st.sidebar.radio('Select OECD Status', ('All', 'OECD', 'NON-OECD'))   
     scores_df = fetch_scores(oecd_status)
     
     if not scores_df.empty:
@@ -27,6 +26,7 @@ def home_page():
             return
         
         sorted_df = scores_df.sort_values(by=score_column)
+        sorted_df_desc = sorted_df.sort_values(by=ranking_column,ascending=False)
 
         # Define colors based on OECD status for home page plot
         colors_home_page = {'OECD': '#3498db', 'NON-OECD': '#e74c3c'}
@@ -53,7 +53,9 @@ def home_page():
 
         # Create a dashboard to show scores for each country
         st.subheader(f"{score_type} Performance Dashboard")
-        st.write(sorted_df[[ranking_column,country_column, score_column]], index=False)
+        sorted_df_desc = sorted_df_desc.reset_index(drop=True)  # Reset index and drop the old index column
+        st.write(sorted_df_desc[[ranking_column, country_column, score_column]])        
+
 
          # Calculate overall scores and display top performers
         scores_df['OverallScore'] = scores_df[['MathematicsScore', 'ScienceScore', 'ReadingScore']].mean(axis=1)
@@ -103,7 +105,6 @@ def home_page():
             width = bar.get_width()
             plt.text(width, bar.get_y() + bar.get_height()/2, f'{width:.2f}', ha='left', va='center')
 
-
         st.pyplot()
 
         plt.figure(figsize=(10, 6))
@@ -121,14 +122,10 @@ def home_page():
         st.pyplot()
        
 
-# Generate random colors for each country once and store them persistently
-country_colors = {}
 
-def generate_random_color():
-    return sb.color_palette('Set2', as_cmap=True)(random.random())
-
-def progress_page():
-    global country_colors  # Use the global variable for country_colors
+# Progress Page Function with modified color generation
+def analytics_page():
+    global country_colors
 
     oecd_status = st.sidebar.radio('Select OECD Status', ('All', 'OECD', 'NON-OECD'))   
     countries = fetch_countries(oecd_status)
@@ -142,6 +139,8 @@ def progress_page():
     for country in selected_countries:
         if country not in country_colors:
             country_colors[country] = generate_random_color()
+
+    ensure_visual_distinctness()  # Ensure visual distinctness of colors
 
     if selected_countries and selected_question_code:
         selected_question_code = selected_question_code[0]  # Get the selected question code from the tuple
@@ -172,17 +171,6 @@ def progress_page():
             plt.title(f'Scatter Plot of {selected_question_code} for Selected Countries')
             st.pyplot()
 
-        elif selected_plot_type == 'Box Plot':
-            plt.figure(figsize=(10, 6))
-            data = [data['counts_df']['Count'] for country, data in data_counts.items()]
-            labels = [country for country, data in data_counts.items()]
-            plt.boxplot(data, labels=labels, patch_artist=True)
-            for patch, color in zip(plt.gca().boxes, [country_colors[country] for country in labels]):
-                patch.set_facecolor(color)
-            plt.xlabel('Countries')
-            plt.ylabel('Count')
-            plt.title(f'Box Plot of {selected_question_code} for Selected Countries')
-            st.pyplot()
 
         elif selected_plot_type == 'Histogram':
             plt.figure(figsize=(10, 6))
