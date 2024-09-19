@@ -19,23 +19,20 @@ def connect_to_database():
 
 
 def fetch_countries(oecd_status):
-    conn = connect_to_database()
-    cursor = conn.cursor()
-
-    if oecd_status == 'OECD':
-        cursor.execute("SELECT DISTINCT CountryRegion FROM pisa2022_data WHERE OECD='OECD'")
-    elif oecd_status == 'NON-OECD':
-        cursor.execute("SELECT DISTINCT CountryRegion FROM pisa2022_data WHERE OECD='NON-OECD'")
-    elif oecd_status == 'All':
-        cursor.execute("SELECT DISTINCT CountryRegion FROM pisa2022_data")  # Fetch all countries regardless of OECD status
-    else:
+    query_dict = {
+        'OECD': "SELECT DISTINCT CountryRegion FROM pisa2022_data WHERE OECD='OECD'",
+        'NON-OECD': "SELECT DISTINCT CountryRegion FROM pisa2022_data WHERE OECD='NON-OECD'",
+        'All': "SELECT DISTINCT CountryRegion FROM pisa2022_data"
+    }
+    query = query_dict.get(oecd_status, None)
+    
+    if not query:
         st.error("Invalid OECD status selected.")
         return []
+    
+    countries = execute_query(query)
+    return [country[0] for country in countries]
 
-    countries = [country[0] for country in cursor.fetchall()]
-
-    conn.close()
-    return countries
 
 
 # Function to fetch questions from codebook
@@ -53,46 +50,63 @@ def fetch_scores(oecd_status):
     conn = connect_to_database()
     cursor = conn.cursor()
 
-    if oecd_status == 'All':
-        cursor.execute("SELECT * FROM fullscore")
-    elif oecd_status == 'OECD':
-        cursor.execute("SELECT  MathematicsRanking, MathematicsCountry, MathematicsOECD, MathematicsScore, ScienceRanking, ScienceCountry, ScienceOECD, ScienceScore,ReadingRanking, ReadingCountry, ReadingOECD, ReadingScore, OverallRanking, OverallCountry, OverallOECD, OverallScore FROM fullscore WHERE MathematicsCountry IN (SELECT CountryRegion FROM pisa2022_data WHERE OECD='OECD')")
-    elif oecd_status == 'NON-OECD':
-        cursor.execute("SELECT  MathematicsRanking, MathematicsCountry, MathematicsOECD, MathematicsScore, ScienceRanking, ScienceCountry, ScienceOECD, ScienceScore,ReadingRanking, ReadingCountry, ReadingOECD, ReadingScore, OverallRanking, OverallCountry, OverallOECD, OverallScore FROM fullscore WHERE MathematicsCountry IN (SELECT CountryRegion FROM pisa2022_data WHERE OECD='NON-OECD')")
-    else:
-        raise ValueError("Invalid OECD status selected.")
+    # Base query
+    query = """
+    SELECT MathematicsRanking, MathematicsCountry, MathematicsOECD, MathematicsScore, 
+           ScienceRanking, ScienceCountry, ScienceOECD, ScienceScore, 
+           ReadingRanking, ReadingCountry, ReadingOECD, ReadingScore, 
+           OverallRanking, OverallCountry, OverallOECD, OverallScore 
+    FROM fullscore
+    """
+    
+    # Append the WHERE clause based on the OECD status
+    if oecd_status in ['OECD', 'NON-OECD']:
+        query += f" WHERE OverallOECD='{oecd_status}'"
 
+    cursor.execute(query)
     scores_data = cursor.fetchall()
-    columns = ['MathematicsRanking','MathematicsCountry','MathematicsOECD', 'MathematicsScore' , 'ScienceRanking','ScienceCountry', 'ScienceOECD', 'ScienceScore', 'ReadingRanking','ReadingCountry','ReadingOECD', 'ReadingScore' ,'OverallRanking', 'OverallCountry','OverallOECD', 'OverallScore']
+    
+    columns = ['MathematicsRanking', 'MathematicsCountry', 'MathematicsOECD', 'MathematicsScore',
+               'ScienceRanking', 'ScienceCountry', 'ScienceOECD', 'ScienceScore',
+               'ReadingRanking', 'ReadingCountry', 'ReadingOECD', 'ReadingScore',
+               'OverallRanking', 'OverallCountry', 'OverallOECD', 'OverallScore']
+    
     scores_df = pd.DataFrame(scores_data, columns=columns)
-
-    # Print the column names fetched from the database
-    print("Columns in scores_df:", scores_df.columns.tolist())
-
+    
     conn.close()
     return scores_df
+
 
 def fetch_data_and_count(oecd_status, countries, question_code):
     conn = connect_to_database()
     cursor = conn.cursor()
 
+    questions = fetch_questions()  # Fetch once outside the loop
     data_counts = {}
 
     for country in countries:
-        if oecd_status == 'All':
-            cursor.execute(f"SELECT {question_code} FROM pisa2022_data WHERE CountryRegion='{country}'")
-        else:
-            cursor.execute(f"SELECT {question_code} FROM pisa2022_data WHERE CountryRegion='{country}' AND OECD='{oecd_status}'")
+        query = f"SELECT {question_code} FROM pisa2022_data WHERE CountryRegion='{country}'"
+        if oecd_status != 'All':
+            query += f" AND OECD='{oecd_status}'"
+
+        cursor.execute(query)
         data = cursor.fetchall()
 
-        # Count occurrences of each value for the current country
         counts = pd.DataFrame(data, columns=[question_code]).value_counts().reset_index(name='Count')
-
-        # Fetch the question label from the codebook
-        question_label = fetch_questions().get(question_code, 'Unknown')
+        question_label = questions.get(question_code, 'Unknown')
 
         data_counts[country] = {'label': question_label, 'counts_df': counts}
 
     conn.close()
     return data_counts
 
+
+def execute_query(query, params=None):
+    try:
+        with connect_to_database() as conn:
+            cursor = conn.cursor()
+            cursor.execute(query, params)
+            return cursor.fetchall()
+    except mysql.connector.Error as err:
+        st.error(f"Error: {err}")
+        return []

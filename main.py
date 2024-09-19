@@ -1,6 +1,7 @@
 import streamlit as st
-from dashboard import *
-
+from home_page import *
+from analytic_page import *
+from streamlit_option_menu import option_menu
 
 
 def main():
