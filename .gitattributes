@@ -1,0 +1,2 @@
+*.csv filter=lfs diff=lfs merge=lfs -text
+C:/1stApril/Work/4rd_Year/4rd2/CSS400_Project_Development/CN1-2023 filter=lfs diff=lfs merge=lfs -text
