@@ -1,0 +1,11 @@
+streamlit
+pandas
+numpy
+matplotlib
+plotly
+pymysql
+streamlit-authenticator
+scikit-learn
+openpyxl
+seaborn
+mysql-connector-python
