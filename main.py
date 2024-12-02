@@ -101,7 +101,7 @@ def main():
 
     else:
         # Once logged in, show the main app interface
-        st.sidebar.image(r'C:\1stApril\Work\4rd_Year\5th\CSS403 Computer Engineering\CN1-2023\pisa2022\image\PISA-Blog-Ilustración.png')
+        st.sidebar.image("images/PISA-Blog-Ilustracion.png")
 
         # Use the option menu for navigation
         with st.sidebar: 
