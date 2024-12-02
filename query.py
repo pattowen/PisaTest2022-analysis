@@ -46,8 +46,7 @@ def fetch_questions():
     query = """
     SELECT Code, Label 
     FROM codebook 
-    WHERE (Code LIKE 'ST%' OR Code LIKE 'IC%') 
-      AND Code IN ({})
+    WHERE Code IN ({})
     """
     if pisa_columns:
         in_clause = ', '.join(['%s'] * len(pisa_columns))
@@ -144,6 +143,123 @@ def fetch_data_and_count(oecd_status, selected_genders, countries, question_code
     conn.close()
     return data_counts
 
+
+def fetch_question_response_and_scores(question_code, countries, selected_score, oecd_status, genders):
+    conn = connect_to_database()
+    cursor = conn.cursor()
+
+    gender_mapping = {"Male": ["1"], "Female": ["2"], "All": []}
+    selected_values = [value for gender in genders for value in gender_mapping.get(gender, [])]
+
+    # Build the SELECT clause dynamically
+    select_clause = f"""
+    SELECT 
+        pisa2022_data.CNT AS Country,
+        pisa2022_data.{question_code} AS Response,
+        full_student_score.Student_ID AS Student_ID,
+        COUNT(*) AS Count
+    """
+    # Include Score column only if selected_score is not None
+    if selected_score:
+        select_clause += f", full_student_score.{selected_score} AS Score"
+
+    query = f"""
+    {select_clause}
+    FROM pisa2022_data
+    JOIN full_student_score ON pisa2022_data.CNTSTUID = full_student_score.Student_ID
+    WHERE pisa2022_data.CNT IN ({','.join(['%s'] * len(countries))})
+    """
+    params = countries
+
+    # Add gender filter dynamically
+    if selected_values:
+        query += " AND pisa2022_data.ST004D01T IN ({})".format(', '.join(['%s'] * len(selected_values)))
+        params.extend(selected_values)
+
+    # Add OECD status filter if applicable
+    if oecd_status != "All":
+        query += " AND pisa2022_data.OECD = %s"
+        params.append(oecd_status)
+
+    # Add GROUP BY clause
+    query += f" GROUP BY pisa2022_data.CNT, pisa2022_data.{question_code}, full_student_score.Student_ID"
+    if selected_score:
+        query += f", full_student_score.{selected_score}"
+
+    cursor.execute(query, params)
+    data = cursor.fetchall()
+    conn.close()
+
+    # Define DataFrame columns based on whether selected_score is included
+    columns = ["Country", "Response", "Student_ID", "Count"]
+    if selected_score:
+        columns.append("Score")
+
+    return pd.DataFrame(data, columns=columns)
+
+def fetch_histogram_questions():
+    conn = connect_to_database()
+    cursor = conn.cursor()
+
+    # Fetch column names from the pisa2022_data table
+    cursor.execute("SHOW COLUMNS FROM pisa2022_data")
+    histogram_columns = [row[0] for row in cursor.fetchall() if row[0].startswith("PV")]
+
+    # Fetch matching questions from the codebook
+    if histogram_columns:
+        query = f"""
+        SELECT Code, Label 
+        FROM codebook 
+        WHERE Code IN ({','.join(['%s'] * len(histogram_columns))})
+        """
+        cursor.execute(query, tuple(histogram_columns))
+        matching_questions = {code: label for code, label in cursor.fetchall()}
+    else:
+        matching_questions = {}
+
+    conn.close()
+    return matching_questions
+def fetch_heatmap_data(country, questions, score, oecd_status=None, genders=None):
+    conn = connect_to_database()
+    cursor = conn.cursor()
+
+    # Map gender options to their database values
+    gender_mapping = {"Male": ["1"], "Female": ["2"], "All": []}
+    selected_values = [value for gender in genders for value in gender_mapping.get(gender, [])]
+
+    # Dynamically construct the SELECT clause for questions
+    select_questions = ", ".join([f"pisa2022_data.{q}" for q in questions])
+    
+    # Construct the SQL query
+    query = f"""
+    SELECT 
+        pisa2022_data.CNT AS Country,
+        {select_questions},  -- Dynamically include selected questions
+        full_student_score.{score} AS Score
+    FROM pisa2022_data
+    JOIN full_student_score ON pisa2022_data.CNTSTUID = full_student_score.Student_ID
+    WHERE pisa2022_data.CNT = %s
+    """
+    params = [country]
+
+    if selected_values:
+        query += " AND pisa2022_data.ST004D01T IN ({})".format(', '.join(['%s'] * len(selected_values)))
+        params.extend(selected_values)
+
+    if oecd_status and oecd_status != "All":
+        query += " AND pisa2022_data.OECD = %s"
+        params.append(oecd_status)
+
+    cursor.execute(query, params)
+    data = cursor.fetchall()
+    conn.close()
+
+    # Define column names dynamically
+    columns = ["Country"] + questions + ["Score"]
+
+    # Return the data as a pandas DataFrame
+    return pd.DataFrame(data, columns=columns)
+
 def fetch_thai_student_data():
     query = """
             SELECT *
@@ -154,27 +270,15 @@ def fetch_thai_student_data():
 def fetch_thai_student_performance():
     query = """
     SELECT 
-        m.MathematicsRanking AS MathRank, 
-        m.MathematicsScore AS MathScore,
-        s.ScienceRanking AS SciRank, 
-        s.ScienceScore AS SciScore,
-        r.ReadingRanking AS ReadRank, 
-        r.ReadingScore AS ReadScore, 
-        o.OverallRanking AS OvaRank, 
-        o.OverallScore AS OvaScore
-    FROM pisa2022.mathscore m
-    JOIN pisa2022.readingscore r ON m.MathematicsCountry = r.ReadingCountry
-    JOIN pisa2022.sciencescore s ON r.ReadingCountry = s.ScienceCountry
-    JOIN pisa2022.overallscore o ON s.ScienceCountry = o.OverallCountry
-    WHERE m.MathematicsCountry = 'Thailand'
-      AND r.ReadingCountry = 'Thailand'
-      AND s.ScienceCountry = 'Thailand'
-      AND o.OverallCountry = 'Thailand'
+        student_id AS StudentID,
+        math_score AS MathScore,
+        science_score AS SciScore,
+        reading_score AS ReadScore,
+        overall_score AS OvaScore
+    FROM pisa2022.full_student_score
+    WHERE country = 'Thailand'
     """
     return execute_query(query)
-
-
-
 
 def fetch_oecd_average():
     query = """

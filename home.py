@@ -49,7 +49,7 @@ def home_page():
 
 
 
-        plot_height = max(300, len(sorted_df) * 20)
+        plot_height = max(700, len(sorted_df) * 10)
         # Plot interactive scatter plot with Plotly
         fig = px.scatter(
             sorted_df,
@@ -148,4 +148,3 @@ def home_page():
             top_overall_df, 'OverallScore', 'OverallCountry',
             'Top Performing Countries Overall', 'purple'
         )
-
