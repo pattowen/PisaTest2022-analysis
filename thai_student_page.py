@@ -76,21 +76,37 @@ def thai_student_performance():
         ["Student-Teacher Ratio (Rounded)", "Computers Available Ratio (Rounded)"]
     )["OVERALL SCORE"].mean().reset_index()
 
-    
-    # Score filter
+ 
+     # Score filter
     st.subheader("Score Distribution")
     score_column = st.selectbox("Select Score for Analysis", ["MATH SCORE", "SCIENCE SCORE", "READING SCORE", "OVERALL SCORE"])
 
-    # Score Distribution Visualization
-    fig_distribution = px.histogram(
-        thai_student_data,
-        x=score_column,
-        nbins=30,
-        title=f"Distribution of {score_column.replace('SCORE', '').title()} Scores",
-        color_discrete_sequence=['#636EFA'],
-        marginal="box",  # Add a box plot on the margins
-        labels={score_column: "Score"}
-    )
+    if selected_gender == "All":
+        # Plot both genders in one chart
+        fig_distribution = px.histogram(
+            thai_student_data,
+            x=score_column,
+            color="Gender",
+            nbins=30,
+            title=f"Distribution of {score_column.replace('SCORE', '').title()} Scores by Gender",
+            color_discrete_sequence=px.colors.qualitative.Set1,
+            barmode="overlay",  # Overlay both genders in the same chart
+            labels={score_column: "Score", "Gender": "Gender"}
+        )
+    else:
+        # Plot for selected gender
+        filtered_data = thai_student_data[thai_student_data["Gender"] == selected_gender]
+        fig_distribution = px.histogram(
+            filtered_data,
+            x=score_column,
+            nbins=30,
+            title=f"Distribution of {score_column.replace('SCORE', '').title()} Scores for {selected_gender}",
+            color_discrete_sequence=['#636EFA'],
+            marginal="box",  # Add a box plot on the margins
+            labels={score_column: "Score"}
+        )
+    
+    # Display the chart
     st.plotly_chart(fig_distribution, use_container_width=True)
 
     
@@ -132,7 +148,7 @@ def thai_student_performance():
         aspect='auto'
     )
     st.plotly_chart(fig_heatmap, use_container_width=True)
-    
+
 # Teacher and Resource Ratios Analysis
     st.subheader("Teacher and Resource Ratios Analysis")
 # Visualization 1: Impact of Student-Teacher Ratio

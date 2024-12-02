@@ -537,20 +537,6 @@ def analytics_page():
                         )
                 else:
                     st.warning("No data available for the selected filters.")
-            elif selected_plot_type == "Heatmap" and selected_country:
-                # Prepare CSV for Heatmap Data
-                if not heatmap_data_grouped.empty:
-                    heatmap_csv_buffer = io.StringIO()
-                    heatmap_data_grouped.to_csv(heatmap_csv_buffer, index=False)
-
-                    st.download_button(
-                        label="Download Heatmap Data as CSV",
-                        data=heatmap_csv_buffer.getvalue(),
-                        file_name=f"heatmap_data_{selected_country}.csv",
-                        mime="text/csv"
-                    )
-                else:
-                    st.warning("No data available to download for the Heatmap.")
 
         with col2:
             if st.button("Save Plot and Analysis to History"):

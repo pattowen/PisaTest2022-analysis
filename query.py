@@ -23,13 +23,8 @@ def execute_query(query, params=None):
 
 
 def fetch_countries(oecd_status):
-    query = "SELECT DISTINCT CNT FROM pisa2022_data"
-    if oecd_status in ['OECD', 'NON-OECD']:
-        query += f" WHERE OECD=%s"
-        countries = execute_query(query, (oecd_status,))
-    else:
-        countries = execute_query(query)
-    return [country[0] for country in countries] if countries else []
+    query = "SELECT DISTINCT CNT FROM pisa2022_data WHERE OECD = %s;"
+
 
 
 # Function to fetch questions from codebook
@@ -307,7 +302,7 @@ def fetch_thai_student_data(selected_score=None, genders=["All"]):
     # Create a DataFrame from the fetched data
     columns = [
         'Student ID', 'MATH SCORE', 'SCIENCE SCORE', 'READING SCORE', 'OVERALL SCORE',
-        "Father level of education (ISCED)", "Mother level of education (ISCED)", "Gender"
+        "Father level of education (ISCED)", "Mother's level of education (ISCED)", "Gender"
     ]
     df = pd.DataFrame(data, columns=columns)
 
@@ -341,21 +336,7 @@ def fetch_oecd_average():
 
 
 
-def fetch_asean_countries_performance():
-    query = """
-        SELECT 
-        OverallCountry,
-        MAX(MathematicsScore) AS MathematicsScore,
-        MAX(ScienceScore) AS ScienceScore,
-        MAX(ReadingScore) AS ReadingScore,
-        MAX(OverallScore) AS OverallScore
-    FROM pisa2022.fullscore
-    WHERE OverallCountry IN ('Brunei Darussalam', 'Cambodia', 'Indonesia', 'Laos', 'Malaysia', 
-                            'Myanmar', 'Philippines', 'Singapore', 'Thailand', 'Viet nam')
-    GROUP BY OverallCountry
 
-    """
-    return execute_query(query)
 
 def execute_query(query, params=None):
     try:
