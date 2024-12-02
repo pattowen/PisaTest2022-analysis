@@ -113,7 +113,7 @@ def fetch_data_and_count(oecd_status, selected_genders, countries, question_code
     query = f"""
     SELECT pisa2022_data.CNT, pisa2022_data.{question_code}, COUNT(*) AS Count
     FROM pisa2022_data
-    JOIN full_student_score ON pisa2022_data.CNTSCHID = full_student_score.Student_ID
+    JOIN full_student_score ON pisa2022_data.CNTSCHID = full_student_score.student_id
     WHERE pisa2022_data.CNT IN ({','.join(['%s'] * len(countries))})
     """
     params = countries
@@ -156,7 +156,7 @@ def fetch_question_response_and_scores(question_code, countries, selected_score,
     SELECT 
         pisa2022_data.CNT AS Country,
         pisa2022_data.{question_code} AS Response,
-        full_student_score.Student_ID AS Student_ID,
+        full_student_score.student_id AS Student_ID,
         COUNT(*) AS Count
     """
     # Include Score column only if selected_score is not None
@@ -166,7 +166,7 @@ def fetch_question_response_and_scores(question_code, countries, selected_score,
     query = f"""
     {select_clause}
     FROM pisa2022_data
-    JOIN full_student_score ON pisa2022_data.CNTSTUID = full_student_score.Student_ID
+    JOIN full_student_score ON pisa2022_data.CNTSTUID = full_student_score.student_id
     WHERE pisa2022_data.CNT IN ({','.join(['%s'] * len(countries))})
     """
     params = countries
@@ -182,7 +182,7 @@ def fetch_question_response_and_scores(question_code, countries, selected_score,
         params.append(oecd_status)
 
     # Add GROUP BY clause
-    query += f" GROUP BY pisa2022_data.CNT, pisa2022_data.{question_code}, full_student_score.Student_ID"
+    query += f" GROUP BY pisa2022_data.CNT, pisa2022_data.{question_code}, full_student_score.student_id"
     if selected_score:
         query += f", full_student_score.{selected_score}"
 
@@ -191,7 +191,7 @@ def fetch_question_response_and_scores(question_code, countries, selected_score,
     conn.close()
 
     # Define DataFrame columns based on whether selected_score is included
-    columns = ["Country", "Response", "Student_ID", "Count"]
+    columns = ["Country", "Response", "student_id", "Count"]
     if selected_score:
         columns.append("Score")
 
@@ -237,7 +237,7 @@ def fetch_heatmap_data(country, questions, score, oecd_status=None, genders=None
         {select_questions},  -- Dynamically include selected questions
         full_student_score.{score} AS Score
     FROM pisa2022_data
-    JOIN full_student_score ON pisa2022_data.CNTSTUID = full_student_score.Student_ID
+    JOIN full_student_score ON pisa2022_data.CNTSTUID = full_student_score.student_id
     WHERE pisa2022_data.CNT = %s
     """
     params = [country]
@@ -279,6 +279,47 @@ def fetch_thai_student_performance():
     WHERE country = 'Thailand'
     """
     return execute_query(query)
+
+def fetch_thai_student_data(selected_score=None, genders=["All"]):
+    conn = connect_to_database()
+    cursor = conn.cursor()
+
+    # Prepare the base query
+    query = """
+        SELECT `STUDENT ID`, `MATH SCORE`, `SCIENCE SCORE`, `READING SCORE`, `OVERALL SCORE`,
+               `Father level of education (ISCED)`, `Mother level of education (ISCED)`, `Gender`
+        FROM thai_student_data
+    """
+
+    # Initialize parameters list
+    params = []
+
+    # Add gender filter if needed
+    if genders != ["All"]:
+        query += " WHERE `Gender` IN ({})".format(", ".join(["%s"] * len(genders)))
+        params.extend(genders)
+
+    # Execute the query
+    cursor.execute(query, tuple(params))
+    data = cursor.fetchall()
+    conn.close()
+
+    # Create a DataFrame from the fetched data
+    columns = [
+        'Student ID', 'MATH SCORE', 'SCIENCE SCORE', 'READING SCORE', 'OVERALL SCORE',
+        "Father level of education (ISCED)", "Mother level of education (ISCED)", "Gender"
+    ]
+    df = pd.DataFrame(data, columns=columns)
+
+    # Map gender values from numeric to descriptive
+    gender_mapping = {'1': 'Male', '2': 'Female'}
+    df['Gender'] = df['Gender'].map(gender_mapping)
+
+    return df
+
+
+
+
 
 def fetch_oecd_average():
     query = """
