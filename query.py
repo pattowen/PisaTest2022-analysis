@@ -23,7 +23,13 @@ def execute_query(query, params=None):
 
 
 def fetch_countries(oecd_status):
-    query = "SELECT DISTINCT CNT FROM pisa2022_data WHERE OECD = %s;"
+    query = "SELECT DISTINCT CNT FROM pisa2022_data"
+    if oecd_status in ['OECD', 'NON-OECD']:
+        query += f" WHERE OECD=%s"
+        countries = execute_query(query, (oecd_status,))
+    else:
+        countries = execute_query(query)
+    return [country[0] for country in countries] if countries else []
 
 
 
